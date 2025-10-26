@@ -94,21 +94,47 @@ const deployCommand = new Command('deploy')
         let finalEnvName = envName;
         
         if (vafConfig) {
-          if (!finalProjectId) {
+          // If YAML has an ID, treat the first argument as environment name
+          if (vafConfig.id) {
             finalProjectId = vafConfig.id.toString();
-          }
-          if (!finalEnvName && Object.keys(vafConfig.environments).length > 0) {
-            utils.error('Environment name is required. Available environments:');
-            Object.keys(vafConfig.environments).forEach(env => {
-              console.log(chalk.cyan(`  - ${env}`));
-            });
+            // If only one argument provided
+            if (!envName && projectId) {
+              // Check if it's a valid environment name
+              if (projectId in vafConfig.environments) {
+                finalEnvName = projectId; // Treat the first arg as environment name
+              } else {
+                // First arg is not a valid environment name
+                utils.error(`Environment "${projectId}" not found in vaf.yml`);
+                utils.info('Available environments:');
+                Object.keys(vafConfig.environments).forEach(env => {
+                  console.log(chalk.cyan(`  - ${env}`));
+                });
+                process.exit(1);
+              }
+            }
+          } else if (!finalProjectId) {
+            // No ID in YAML and no project ID provided
+            utils.error('Project ID is required');
+            utils.info('Either provide it as the first argument or add it to vaf.yml');
             process.exit(1);
           }
         }
         
-        if (!finalProjectId || !finalEnvName) {
-          utils.error('Project ID and environment name are required');
-          utils.info('Either provide them as arguments or configure vaf.yml');
+        // Validate we have both project ID and environment name
+        if (!finalProjectId) {
+          utils.error('Project ID is required');
+          utils.info('Either provide it as the first argument or add it to vaf.yml');
+          process.exit(1);
+        }
+        
+        if (!finalEnvName) {
+          utils.error('Environment name is required');
+          if (vafConfig && Object.keys(vafConfig.environments).length > 0) {
+            console.log(chalk.gray('Available environments:'));
+            Object.keys(vafConfig.environments).forEach(env => {
+              console.log(chalk.cyan(`  - ${env}`));
+            });
+          }
           process.exit(1);
         }
         
