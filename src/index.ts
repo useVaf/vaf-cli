@@ -8,6 +8,8 @@ import envCommand from './commands/env';
 import varsCommand from './commands/envvars';
 import deployCommand from './commands/deploy';
 import configCommand from './commands/config';
+import databasesCommand from './commands/databases';
+import cachesCommand from './commands/caches';
 
 const program = new Command();
 
@@ -30,6 +32,10 @@ program.addCommand(envCommand);
 
 // Deployment commands
 program.addCommand(deployCommand);
+
+// Database and cache management
+program.addCommand(databasesCommand);
+program.addCommand(cachesCommand);
 
 // Configuration commands
 program.addCommand(configCommand);

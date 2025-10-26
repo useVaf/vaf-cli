@@ -78,6 +78,71 @@ vaf env vars remove <project-id> <env-id> DATABASE_URL
 vaf env vars set-file <project-id> <env-id> .env
 ```
 
+### Database Management
+
+```bash
+# List all databases
+vaf databases list
+
+# Create a new database
+vaf databases create
+
+# Show database details
+vaf databases show <database-id>
+
+# Delete a database (with confirmation)
+vaf databases delete <database-id>
+
+# Delete without confirmation
+vaf databases delete <database-id> --force
+```
+
+**Database Engines:**
+- MySQL 8.0 Fixed Size Database
+- MySQL 5.7 Fixed Size Database
+- MySQL 8.0 Serverless v2
+- PostgreSQL 17 Fixed Size Database
+- PostgreSQL 16.4 Serverless v2
+- PostgreSQL 11.0 Serverless v1
+
+**Server Specifications:**
+- T3 Family: db.t3.micro, db.t3.small, db.t3.medium, db.t3.large, db.t3.xlarge, db.t3.2xlarge
+- T4G Family: db.t4g.micro, db.t4g.small, db.t4g.medium, db.t4g.large, db.t4g.xlarge
+- M5 Family: db.m5.large, db.m5.xlarge, db.m5.2xlarge
+- R5 Family: db.r5.large, db.r5.xlarge, db.r5.2xlarge
+
+**Note:** Database creation and deletion are asynchronous operations. Use `vaf databases show <id>` to check status.
+
+### Cache Management
+
+```bash
+# List all caches
+vaf caches list
+
+# Create a new cache
+vaf caches create
+
+# Show cache details
+vaf caches show <cache-id>
+
+# Delete a cache (with confirmation)
+vaf caches delete <cache-id>
+
+# Delete without confirmation
+vaf caches delete <cache-id> --force
+```
+
+**Cache Types:**
+- Redis 7.x Cluster
+- Redis 6.x Cluster
+- Redis 5.x Cluster
+
+**Server Specifications:**
+- cache.t3.micro, cache.t3.small, cache.t3.medium, cache.t3.large, cache.t3.xlarge
+- cache.r5.large, cache.r5.xlarge, cache.r5.2xlarge
+
+**Note:** Cache creation and deletion are asynchronous operations. Use `vaf caches show <id>` to check status.
+
 ### Deployment
 
 **Using YAML Configuration (Recommended):**
@@ -324,6 +389,18 @@ The CLI expects the following API structure:
 - `GET /api/projects/:projectId/environments/:envName/deployment/upload-url` - Get signed upload URL
 - `POST /api/projects/:projectId/environments/:envName/deployment/deploy` - Trigger deployment
 - `GET /api/projects/:projectId/environments/:envName/deployment/:deploymentId` - Get deployment status
+
+**Database Management:**
+- `POST /api/databases` - Create database
+- `GET /api/databases` - List user databases
+- `GET /api/databases/:id` - Get database details
+- `DELETE /api/databases/:id` - Delete database
+
+**Cache Management:**
+- `POST /api/caches` - Create cache
+- `GET /api/caches` - List user caches
+- `GET /api/caches/:id` - Get cache details
+- `DELETE /api/caches/:id` - Delete cache
 
 All requests (except login) require JWT Bearer token authentication.
 
