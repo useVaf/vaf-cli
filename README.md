@@ -196,8 +196,10 @@ environments:
 Then deploy:
 
 ```bash
-# Deploy using YAML config
-vaf deploy develop
+# Deploy using YAML config (with project ID in vaf.yml)
+vaf deploy production
+# or if you want to specify project ID explicitly
+vaf deploy <project-id> production
 
 # Deploy with watch mode
 vaf deploy production --watch
@@ -205,6 +207,8 @@ vaf deploy production --watch
 # Override configuration from CLI
 vaf deploy develop --memory 4096 --timeout 1200
 ```
+
+**Note:** When your `vaf.yml` contains a project ID, you can simply run `vaf deploy <environment-name>`. The project ID from the YAML file will be used automatically.
 
 **Without YAML Configuration:**
 
