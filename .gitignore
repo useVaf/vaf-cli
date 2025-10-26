@@ -1,0 +1,13 @@
+node_modules/
+dist/
+*.log
+.env
+*.zip
+.DS_Store
+*.swp
+*.swo
+*~
+.vaf/
+coverage/
+.nyc_output/
+

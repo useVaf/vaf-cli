@@ -1,0 +1,55 @@
+{
+  "name": "vaf-cli",
+  "version": "0.1.0",
+  "description": "VAF CLI - Command-line interface for VAF backend API",
+  "main": "dist/index.js",
+  "bin": {
+    "vaf": "./dist/index.js"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "QUICKSTART.md",
+    ".vafignore.example"
+  ],
+  "scripts": {
+    "build": "tsc && chmod +x dist/index.js",
+    "watch": "tsc --watch",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "vaf",
+    "cli",
+    "deployment",
+    "environment"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:useVaf/vaf-cli.git"
+  },
+  "dependencies": {
+    "commander": "^11.1.0",
+    "inquirer": "^9.2.12",
+    "ora": "^7.0.1",
+    "chalk": "^4.1.2",
+    "axios": "^1.6.5",
+    "archiver": "^6.0.1",
+    "form-data": "^4.0.0",
+    "chokidar": "^3.6.0",
+    "jsonfile": "^6.1.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "@types/inquirer": "^9.0.7",
+    "@types/archiver": "^6.0.2",
+    "@types/jsonfile": "^6.1.4",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2"
+  }
+}
+
