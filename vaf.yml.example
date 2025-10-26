@@ -1,0 +1,32 @@
+id: 73512
+name: SnapSnag
+environments:
+    develop:
+        runtime: docker
+        memory: 3008
+        timeout: 900
+        database: dev-snapsnag-db
+        cache: eventers-cache
+        storage: develop-snapsnag-storage
+        build:
+            - 'npm ci'
+            - 'npm run build'
+            - 'echo "Build complete"'
+        deploy:
+            - 'npm run migrate'
+            - 'npm run seed'
+    
+    production:
+        runtime: nodejs18.x
+        memory: 3008
+        timeout: 900
+        database: prd-snapsnag-db
+        cache: eventers-cache
+        storage: prd-snapsnag-storage
+        build:
+            - 'npm ci'
+            - 'npm run build:prod'
+        deploy:
+            - 'npm run migrate'
+            - 'echo "Deployed to production"'
+

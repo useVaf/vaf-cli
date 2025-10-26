@@ -80,13 +80,99 @@ vaf env vars set-file <project-id> <env-id> .env
 
 ### Deployment
 
+**Using YAML Configuration (Recommended):**
+
+Create a `vaf.yml` or `vapor.yml` file in your project root:
+
+```yaml
+id: 73512
+name: SnapSnag
+environments:
+    develop:
+        runtime: nodejs18.x
+        memory: 3008
+        timeout: 900
+        database: dev-snapsnag-db
+        cache: eventers-cache
+        storage: develop-snapsnag-storage
+        build:
+            - 'npm ci'
+            - 'npm run build'
+        deploy:
+            - 'npm run migrate'
+    
+    production:
+        runtime: nodejs18.x
+        memory: 3008
+        timeout: 900
+        database: prd-snapsnag-db
+        cache: eventers-cache
+        storage: prd-snapsnag-storage
+        build:
+            - 'npm ci'
+            - 'npm run build:prod'
+```
+
+Then deploy:
+
 ```bash
-# Deploy to an environment
-vaf deploy <project-id> <env-id>
+# Deploy using YAML config
+vaf deploy develop
+
+# Deploy with watch mode
+vaf deploy production --watch
+
+# Override configuration from CLI
+vaf deploy develop --memory 4096 --timeout 1200
+```
+
+**Without YAML Configuration:**
+
+```bash
+# Deploy with all parameters specified
+vaf deploy <project-id> <env-name> \\
+  --memory 3008 \\
+  --timeout 900 \\
+  --database prd-db \\
+  --cache my-cache \\
+  --storage my-storage \\
+  --runtime nodejs18.x \\
+  --handler index.handler
 
 # Deploy with watch mode (auto-deploy on changes)
-vaf deploy <project-id> <env-id> --watch
+vaf deploy <project-id> <env-name> --watch
 ```
+
+**YAML Configuration Options:**
+- `id` - Project ID (can be overridden with CLI argument)
+- `name` - Project name
+- `environments.<env-name>.runtime` - Runtime (e.g., nodejs18.x, docker)
+- `environments.<env-name>.memory` - Memory in MB
+- `environments.<env-name>.timeout` - Timeout in seconds
+- `environments.<env-name>.database` - Database name
+- `environments.<env-name>.cache` - Cache name
+- `environments.<env-name>.storage` - Storage name
+- `environments.<env-name>.build` - Array of build commands to run
+- `environments.<env-name>.deploy` - Array of deployment commands (future feature)
+
+**CLI Options:**
+- `--memory <mb>` - Memory in MB (overrides YAML)
+- `--timeout <seconds>` - Timeout in seconds (overrides YAML)
+- `--database <name>` - Database name (overrides YAML)
+- `--cache <name>` - Cache name (overrides YAML)
+- `--storage <name>` - Storage name (overrides YAML)
+- `--runtime <runtime>` - Runtime (overrides YAML)
+- `--handler <handler>` - Handler function (overrides YAML)
+- `--no-build` - Skip running build commands from YAML
+- `--watch` - Watch for changes and auto-deploy
+
+**The deployment process:**
+1. Loads configuration from `vaf.yml` or `vapor.yml` (optional)
+2. Runs build commands from YAML or falls back to `npm run build`
+3. Creates a zip package (respects .vafignore)
+4. Gets a signed upload URL from the API
+5. Uploads the package
+6. Triggers deployment with your configuration
 
 ### Configuration
 
@@ -123,6 +209,79 @@ Configuration is stored in `~/.vaf/config.json`:
 }
 ```
 
+## YAML Configuration
+
+Create a `vaf.yml` or `vapor.yml` file in your project root to configure deployment settings. This allows you to:
+
+- Store project ID and environment configuration
+- Define custom build commands per environment
+- Reuse configurations across deployments
+- Override settings via CLI arguments
+
+### Example Configuration
+
+```yaml
+id: 73512
+name: SnapSnag
+environments:
+    develop:
+        runtime: docker
+        memory: 3008
+        timeout: 900
+        database: dev-snapsnag-db
+        cache: eventers-cache
+        storage: develop-snapsnag-storage
+        build:
+            - 'COMPOSER_MIRROR_PATH_REPOS=1 composer install --no-dev'
+            - 'php artisan event:cache'
+            - 'npm ci && npm run prod && rm -rf node_modules'
+        deploy:
+            - 'php artisan migrate --force'
+    
+    production:
+        runtime: nodejs18.x
+        memory: 3008
+        timeout: 900
+        database: prd-snapsnag-db
+        cache: eventers-cache
+        storage: prd-snapsnag-storage
+        build:
+            - 'npm ci'
+            - 'npm run build:prod'
+```
+
+### Supported Fields
+
+**Project Level:**
+- `id` - Project ID (required if not provided via CLI)
+- `name` - Project name
+
+**Environment Level:**
+- `runtime` - Runtime version (e.g., `nodejs18.x`, `docker`)
+- `memory` - Memory in MB
+- `timeout` - Timeout in seconds
+- `database` - Database connection name
+- `cache` - Cache connection name
+- `storage` - Storage connection name
+- `build` - Array of shell commands to run before deployment
+- `deploy` - Array of shell commands to run after deployment (planned feature)
+
+### Usage with YAML
+
+```bash
+# Deploy using environment from YAML
+vaf deploy develop
+
+# Deploy and override a setting
+vaf deploy production --memory 4096
+
+# Skip build commands
+vaf deploy develop --no-build
+
+# Use watch mode
+vaf deploy production --watch
+```
+
 ## .vafignore
 
 Create a `.vafignore` file in your project root to exclude files from deployment:
@@ -141,20 +300,30 @@ coverage/
 
 The CLI expects the following API structure:
 
+**Authentication:**
 - `POST /api/login` - Authenticate user
 - `GET /api/me` - Get current user info
+
+**Projects:**
 - `GET /api/projects` - List projects
 - `POST /api/projects` - Create project
 - `GET /api/projects/:id` - Get project details
 - `DELETE /api/projects/:id` - Delete project
+
+**Environments:**
 - `GET /api/projects/:id/environments` - List environments
 - `POST /api/projects/:id/environments` - Create environment
 - `GET /api/projects/:id/environments/:envId` - Get environment details
 - `DELETE /api/projects/:id/environments/:envId` - Delete environment
+
+**Environment Variables:**
 - `GET /api/projects/:id/environments/:envId/env-variables` - Get env variables
 - `POST /api/projects/:id/environments/:envId/env-variables` - Set env variables
-- `POST /api/projects/:id/environments/:envId/deployments` - Create deployment
-- `GET /api/projects/:id/environments/:envId/deployments/:deploymentId` - Get deployment status
+
+**Deployment:**
+- `GET /api/projects/:projectId/environments/:envName/deployment/upload-url` - Get signed upload URL
+- `POST /api/projects/:projectId/environments/:envName/deployment/deploy` - Trigger deployment
+- `GET /api/projects/:projectId/environments/:envName/deployment/:deploymentId` - Get deployment status
 
 All requests (except login) require JWT Bearer token authentication.
 

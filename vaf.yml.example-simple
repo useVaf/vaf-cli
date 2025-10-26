@@ -1,0 +1,9 @@
+id: 12345
+name: MyApp
+environments:
+    production:
+        runtime: nodejs18.x
+        memory: 512
+        timeout: 30
+        handler: index.handler
+

@@ -56,12 +56,48 @@ vaf env create <project-id> production
 
 ### 5. Deploy Your Application
 
+**Option A: Using YAML Configuration (Recommended)**
+
+Create a `vaf.yml` file in your project root:
+
+```yaml
+id: 73512
+name: MyApp
+environments:
+    production:
+        runtime: nodejs18.x
+        memory: 512
+        timeout: 30
+        database: my-db
+        cache: my-cache
+        storage: my-storage
+        build:
+            - 'npm ci'
+            - 'npm run build'
+```
+
+Then deploy:
+
 ```bash
-# Deploy to production
-vaf deploy <project-id> <env-id>
+# Deploy to production (uses vaf.yml)
+vaf deploy production
 
 # Or use watch mode for auto-deploy
-vaf deploy <project-id> <env-id> --watch
+vaf deploy production --watch
+```
+
+**Option B: Without YAML Configuration**
+
+```bash
+# Deploy with all parameters
+vaf deploy <project-id> <env-name> \\
+  --memory 512 \\
+  --timeout 30 \\
+  --database my-db \\
+  --runtime nodejs18.x
+
+# Or use watch mode for auto-deploy
+vaf deploy <project-id> <env-name> --watch
 ```
 
 ### 6. Manage Environment Variables

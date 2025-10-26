@@ -11,3 +11,7 @@ dist/
 coverage/
 .nyc_output/
 
+# VAF config (may contain secrets)
+vaf.yml
+vapor.yml
+
