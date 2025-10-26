@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import * as chalk from 'chalk';
 import { loginCommand, logoutCommand, whoamiCommand } from './commands/auth';
+import initCommand from './commands/init';
 import projectsCommand from './commands/projects';
 import envCommand from './commands/env';
 import varsCommand from './commands/envvars';
@@ -16,7 +17,10 @@ const program = new Command();
 program
   .name('vaf')
   .description('VAF CLI - Command-line interface for VAF backend API')
-  .version('0.1.0');
+  .version('0.1.1');
+
+// Project initialization
+program.addCommand(initCommand);
 
 // Authentication commands
 program.addCommand(loginCommand);

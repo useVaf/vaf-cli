@@ -17,6 +17,21 @@ npm link
 
 ## Usage
 
+### Project Initialization
+
+```bash
+# Initialize a new VAF project
+vaf init
+```
+
+This will create a `vaf.yml` configuration file in your current directory. The interactive wizard will guide you through:
+- Project ID and name
+- Number of environments
+- Runtime settings (memory, timeout)
+- Database, cache, and storage configuration
+- Build commands
+- Deployment commands
+
 ### Authentication
 
 ```bash
