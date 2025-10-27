@@ -190,9 +190,36 @@ const deployCommand = new Command('deploy')
           const stats = fs.statSync(tempZip);
           utils.info(`Package size: ${formatBytes(stats.size)}`);
 
+          // Resolve environment name to ID
+          utils.info('Resolving environment...');
+          const environments = await api.get<any[]>(
+            `/api/projects/${finalProjectId}/environments`
+          );
+          
+          // Find environment by name (first try name, then use as ID)
+          let environmentId = finalEnvName;
+          const environment = environments.find(
+            (env: any) => env.name === finalEnvName || env.id === finalEnvName
+          );
+          
+          if (environment) {
+            environmentId = environment.id;
+          } else {
+            // Try to use finalEnvName as ID if no match by name
+            const envById = environments.find((env: any) => env.id === finalEnvName);
+            if (!envById) {
+              utils.error(`Environment "${finalEnvName}" not found`);
+              console.log(chalk.gray('Available environments:'));
+              environments.forEach((env: any) => {
+                console.log(chalk.cyan(`  - ${env.name} (${env.id})`));
+              });
+              process.exit(1);
+            }
+          }
+
           utils.info('Getting upload URL...');
           const uploadUrlResponse = await api.get<{ uploadUrl: string }>(
-            `/api/projects/${finalProjectId}/environments/${finalEnvName}/deployment/upload-url`
+            `/api/projects/${finalProjectId}/environments/${environmentId}/deployment/upload-url`
           );
 
           utils.info('Uploading package...');
@@ -247,7 +274,7 @@ const deployCommand = new Command('deploy')
 
           // Trigger deployment
           const deployment = await api.post<any>(
-            `/api/projects/${finalProjectId}/environments/${finalEnvName}/deployment/deploy`,
+            `/api/projects/${finalProjectId}/environments/${environmentId}/deployment/deploy`,
             deploymentParams
           );
 
@@ -255,7 +282,7 @@ const deployCommand = new Command('deploy')
 
           // Poll for deployment status if we have an ID
           if (deployment.id) {
-            await pollDeploymentStatus(finalProjectId, finalEnvName, deployment.id);
+            await pollDeploymentStatus(finalProjectId, environmentId, deployment.id);
           }
         } finally {
           // Clean up temp file
@@ -303,7 +330,7 @@ const deployCommand = new Command('deploy')
 
 async function pollDeploymentStatus(
   projectId: string,
-  envName: string,
+  envId: string,
   deploymentId: string
 ): Promise<void> {
   let attempts = 0;
@@ -312,7 +339,7 @@ async function pollDeploymentStatus(
   while (attempts < maxAttempts) {
     try {
       const deployment = await api.get<any>(
-        `/api/projects/${projectId}/environments/${envName}/deployment/${deploymentId}`
+        `/api/projects/${projectId}/environments/${envId}/deployment/${deploymentId}`
       );
 
       console.log(chalk.blue(`Status: ${deployment.status}`));
