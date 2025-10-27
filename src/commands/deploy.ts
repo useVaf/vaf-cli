@@ -178,10 +178,9 @@ const deployCommand = new Command('deploy')
         // Read ignore patterns
         const ignorePatterns = await readVafIgnore(cwd);
         
-        // Create temp zip file with timestamp
-        const timestamp = Date.now();
-        const tempZip = path.join(cwd, `.vaf-deploy-temp-${timestamp}.zip`);
-        const deploymentKey = `deployments/${timestamp}-package.zip`;
+          // Create temp zip file with timestamp
+          const timestamp = Date.now();
+          const tempZip = path.join(cwd, `.vaf-deploy-temp-${timestamp}.zip`);
         
         try {
           utils.info('Creating deployment package...');
@@ -222,8 +221,11 @@ const deployCommand = new Command('deploy')
             `/api/projects/${finalProjectId}/environments/${environmentId}/deployment/upload-url`
           );
 
-          if (uploadUrlResponse.bucket) {
-            utils.info(`Upload destination: ${uploadUrlResponse.bucket}${uploadUrlResponse.key ? ` (key: ${uploadUrlResponse.key})` : ''}`);
+          // Get the deployment key from the upload URL response
+          const deploymentKey = uploadUrlResponse.key || `deployments/${timestamp}-package.zip`;
+          
+          if (uploadUrlResponse.key) {
+            utils.info(`Upload destination: ${uploadUrlResponse.key}`);
           }
 
           utils.info('Uploading package...');
