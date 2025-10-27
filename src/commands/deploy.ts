@@ -254,22 +254,20 @@ const deployCommand = new Command('deploy')
             deploymentParams.timeout = envConfig.timeout;
           }
           
-          if (options.database) {
-            deploymentParams.database = options.database;
-          } else if (envConfig?.database) {
-            deploymentParams.database = envConfig.database;
+          // Only add database, cache, storage if they are non-empty strings
+          const dbValue = options.database || envConfig?.database;
+          if (dbValue && typeof dbValue === 'string' && dbValue.trim().length > 0) {
+            deploymentParams.database = dbValue;
           }
           
-          if (options.cache) {
-            deploymentParams.cache = options.cache;
-          } else if (envConfig?.cache) {
-            deploymentParams.cache = envConfig.cache;
+          const cacheValue = options.cache || envConfig?.cache;
+          if (cacheValue && typeof cacheValue === 'string' && cacheValue.trim().length > 0) {
+            deploymentParams.cache = cacheValue;
           }
           
-          if (options.storage) {
-            deploymentParams.storage = options.storage;
-          } else if (envConfig?.storage) {
-            deploymentParams.storage = envConfig.storage;
+          const storageValue = options.storage || envConfig?.storage;
+          if (storageValue && typeof storageValue === 'string' && storageValue.trim().length > 0) {
+            deploymentParams.storage = storageValue;
           }
 
           // Trigger deployment
