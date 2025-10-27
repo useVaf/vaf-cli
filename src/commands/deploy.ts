@@ -4,6 +4,7 @@ import * as path from 'path';
 import chalk from 'chalk';
 import chokidar from 'chokidar';
 import axios from 'axios';
+import archiver from 'archiver';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as yaml from 'js-yaml';
@@ -58,13 +59,27 @@ async function createLayerPackage(cwd: string): Promise<string> {
     throw new Error('node_modules not found. Run npm install first.');
   }
   
-  // Create zip of layer directory
-  await zipDirectory(layerDir, layerZip, []);
-  
-  // Clean up layer directory
-  fs.rmSync(layerDir, { recursive: true, force: true });
-  
-  return layerZip;
+  // Create zip with correct structure: nodejs/node_modules (not just node_modules)
+  return new Promise((resolve, reject) => {
+    const output = fs.createWriteStream(layerZip);
+    const archive = archiver('zip', { zlib: { level: 9 } });
+
+    output.on('close', () => {
+      // Clean up layer directory
+      fs.rmSync(layerDir, { recursive: true, force: true });
+      resolve(layerZip);
+    });
+    output.on('error', reject);
+    archive.on('error', reject);
+
+    archive.pipe(output);
+    
+    // Add nodejs directory specifically to preserve the structure
+    // The second parameter 'nodejs' is the entry name in the zip
+    archive.directory(layerNodeJsDir, 'nodejs');
+    
+    archive.finalize();
+  });
 }
 
 async function createThinPackage(cwd: string, tempZip: string): Promise<string> {
