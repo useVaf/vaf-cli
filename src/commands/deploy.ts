@@ -176,8 +176,28 @@ const deployCommand = new Command('deploy')
           }
         }
 
+        // Install production dependencies
+        utils.info('Installing production dependencies...');
+        try {
+          await execAsync('npm ci --omit=dev', { cwd });
+          utils.success('Dependencies installed');
+        } catch (error: any) {
+          // If npm ci fails, try npm install --production
+          try {
+            await execAsync('npm install --production --no-audit --no-fund', { cwd });
+            utils.success('Dependencies installed');
+          } catch (fallbackError: any) {
+            utils.warn('Failed to install production dependencies, using existing node_modules...');
+          }
+        }
+
         // Read ignore patterns
         const ignorePatterns = await readVafIgnore(cwd);
+        
+        // Remove node_modules from ignore patterns to include it in the deployment
+        const filteredIgnorePatterns = ignorePatterns.filter(
+          pattern => !pattern.includes('node_modules')
+        );
         
           // Create temp zip file with timestamp
           const timestamp = Date.now();
@@ -185,7 +205,7 @@ const deployCommand = new Command('deploy')
         
         try {
           utils.info('Creating deployment package...');
-          await zipDirectory(cwd, tempZip, ignorePatterns);
+          await zipDirectory(cwd, tempZip, filteredIgnorePatterns);
 
           const stats = fs.statSync(tempZip);
           utils.info(`Package size: ${formatBytes(stats.size)}`);
