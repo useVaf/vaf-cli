@@ -204,6 +204,9 @@ vaf deploy <project-id> production
 # Deploy with watch mode
 vaf deploy production --watch
 
+# Deploy with Lambda layers (for large packages)
+vaf deploy production --use-layers
+
 # Override configuration from CLI
 vaf deploy develop --memory 4096 --timeout 1200
 ```
@@ -225,6 +228,9 @@ vaf deploy <project-id> <env-name> \\
 
 # Deploy with watch mode (auto-deploy on changes)
 vaf deploy <project-id> <env-name> --watch
+
+# Deploy with Lambda layers (for large packages >50MB)
+vaf deploy <project-id> <env-name> --use-layers
 ```
 
 **YAML Configuration Options:**
