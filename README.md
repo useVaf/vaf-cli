@@ -268,11 +268,21 @@ vaf deploy <project-id> <env-name> --use-layers
 6. Uploads the package (and layer if using layers)
 7. Triggers deployment with your configuration
 
-**When to use layers:**
-- Package size > 50MB compressed
-- Large node_modules folder (>200MB uncompressed)
-- Want faster code-only deployments
-- Need to stay within Lambda limits (250MB unzipped)
+**Lambda Layers:**
+Layers are **enabled by default** to handle large packages efficiently. They:
+- Keep deployment packages within Lambda limits (250MB unzipped)
+- Enable faster code-only deployments (only change code, not dependencies)
+- Support large node_modules folders
+- Are automatically created and reused
+
+**To disable layers (use full package):**
+```yaml
+environments:
+    production:
+        useLayers: false  # Disable layers
+```
+
+Or use CLI: `vaf deploy production --no-use-layers`
 
 ### Configuration
 
