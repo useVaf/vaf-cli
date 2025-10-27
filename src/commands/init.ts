@@ -14,6 +14,7 @@ interface EnvironmentConfig {
   cache?: string;
   storage?: string;
   handler?: string;
+  useLayers?: boolean;
   build?: string[];
   deploy?: string[];
 }
@@ -151,6 +152,12 @@ const initCommand = new Command('init')
           },
           {
             type: 'confirm',
+            name: 'useLayers',
+            message: 'Use Lambda layers for large packages (recommended)?',
+            default: true,
+          },
+          {
+            type: 'confirm',
             name: 'addBuild',
             message: 'Add build commands?',
             default: true,
@@ -236,6 +243,7 @@ const initCommand = new Command('init')
           memory: envAnswers.memory,
           timeout: envAnswers.timeout,
           handler: envAnswers.handler,
+          useLayers: envAnswers.useLayers,
         };
 
         if (envAnswers.database) {

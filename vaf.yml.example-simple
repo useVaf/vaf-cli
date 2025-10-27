@@ -6,4 +6,5 @@ environments:
         memory: 512
         timeout: 30
         handler: index.handler
+        useLayers: true
 

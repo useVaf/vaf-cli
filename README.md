@@ -360,9 +360,11 @@ environments:
 - `runtime` - Runtime version (e.g., `nodejs18.x`, `docker`)
 - `memory` - Memory in MB
 - `timeout` - Timeout in seconds
+- `handler` - Handler function (e.g., `index.handler`)
 - `database` - Database connection name
 - `cache` - Cache connection name
 - `storage` - Storage connection name
+- `useLayers` - Use Lambda layers for large packages (default: `true`)
 - `build` - Array of shell commands to run before deployment
 - `deploy` - Array of shell commands to run after deployment (planned feature)
 

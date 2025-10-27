@@ -92,6 +92,7 @@ interface VafConfig {
       cache?: string;
       storage?: string;
       handler?: string;
+      useLayers?: boolean;
       build?: string[];
       deploy?: string[];
     };
@@ -251,7 +252,11 @@ const deployCommand = new Command('deploy')
         // Create temp zip file with timestamp
         const timestamp = Date.now();
         const tempZip = path.join(cwd, `.vaf-deploy-temp-${timestamp}.zip`);
-        const useLayers = options['use-layers'];
+        
+        // Determine if we should use layers (CLI option overrides YAML config, defaults to true)
+        const useLayers = options['use-layers'] !== undefined 
+          ? options['use-layers'] 
+          : (envConfig?.useLayers !== undefined ? envConfig.useLayers : true);
         
         try {
           let layerArn: string | undefined;
