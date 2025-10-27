@@ -13,6 +13,7 @@ interface EnvironmentConfig {
   database?: string;
   cache?: string;
   storage?: string;
+  handler?: string;
   build?: string[];
   deploy?: string[];
 }
@@ -143,6 +144,12 @@ const initCommand = new Command('init')
             default: null,
           },
           {
+            type: 'input',
+            name: 'handler',
+            message: 'Handler function (e.g., index.handler):',
+            default: 'index.handler',
+          },
+          {
             type: 'confirm',
             name: 'addBuild',
             message: 'Add build commands?',
@@ -228,6 +235,7 @@ const initCommand = new Command('init')
           runtime: envAnswers.runtime,
           memory: envAnswers.memory,
           timeout: envAnswers.timeout,
+          handler: envAnswers.handler,
         };
 
         if (envAnswers.database) {

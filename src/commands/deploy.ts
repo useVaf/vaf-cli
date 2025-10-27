@@ -38,6 +38,7 @@ interface VafConfig {
       database?: string;
       cache?: string;
       storage?: string;
+      handler?: string;
       build?: string[];
       deploy?: string[];
     };
@@ -45,7 +46,7 @@ interface VafConfig {
 }
 
 function loadVafConfig(cwd: string): VafConfig | null {
-  const configFiles = ['vaf.yml', 'vapor.yml'];
+  const configFiles = ['vaf.yml'];
   
   for (const configFile of configFiles) {
     const filePath = path.join(cwd, configFile);
@@ -250,7 +251,7 @@ const deployCommand = new Command('deploy')
           const deploymentParams: any = {
             deploymentKey,
             runtime: options.runtime || envConfig?.runtime || 'nodejs18.x',
-            handler: options.handler || 'index.handler',
+            handler: options.handler || envConfig?.handler || 'index.handler',
           };
 
           // Add optional parameters (CLI options override YAML config)
