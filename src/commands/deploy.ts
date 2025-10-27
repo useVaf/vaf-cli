@@ -218,18 +218,28 @@ const deployCommand = new Command('deploy')
           }
 
           utils.info('Getting upload URL...');
-          const uploadUrlResponse = await api.get<{ uploadUrl: string }>(
+          const uploadUrlResponse = await api.get<{ uploadUrl: string; key?: string; bucket?: string }>(
             `/api/projects/${finalProjectId}/environments/${environmentId}/deployment/upload-url`
           );
+
+          if (uploadUrlResponse.bucket) {
+            utils.info(`Upload destination: ${uploadUrlResponse.bucket}${uploadUrlResponse.key ? ` (key: ${uploadUrlResponse.key})` : ''}`);
+          }
 
           utils.info('Uploading package...');
           // Upload the zip file using the signed URL
           const fileBuffer = fs.readFileSync(tempZip);
-          await axios.put(uploadUrlResponse.uploadUrl, fileBuffer, {
-            headers: {
-              'Content-Type': 'application/zip',
-            },
-          });
+          try {
+            await axios.put(uploadUrlResponse.uploadUrl, fileBuffer, {
+              headers: {
+                'Content-Type': 'application/zip',
+              },
+            });
+            utils.success('Package uploaded successfully');
+          } catch (uploadError: any) {
+            utils.error(`Failed to upload package: ${uploadError.message}`);
+            throw uploadError;
+          }
 
           utils.info('Triggering deployment...');
           
