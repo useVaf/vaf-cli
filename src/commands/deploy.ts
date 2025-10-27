@@ -254,7 +254,7 @@ const deployCommand = new Command('deploy')
             deploymentParams.timeout = envConfig.timeout;
           }
           
-          // Only add database, cache, storage if they are non-empty strings
+          // Only add database, cache, storage if they have non-empty string values
           const dbValue = options.database || envConfig?.database;
           if (dbValue && typeof dbValue === 'string' && dbValue.trim().length > 0) {
             deploymentParams.database = dbValue;
@@ -270,10 +270,21 @@ const deployCommand = new Command('deploy')
             deploymentParams.storage = storageValue;
           }
 
+          // Remove undefined values to avoid validation errors
+          const cleanedParams: any = {};
+          Object.keys(deploymentParams).forEach(key => {
+            if (deploymentParams[key] !== undefined && deploymentParams[key] !== null) {
+              cleanedParams[key] = deploymentParams[key];
+            }
+          });
+
+          utils.info('Deployment parameters:');
+          console.log(chalk.gray(JSON.stringify(cleanedParams, null, 2)));
+
           // Trigger deployment
           const deployment = await api.post<any>(
             `/api/projects/${finalProjectId}/environments/${environmentId}/deployment/deploy`,
-            deploymentParams
+            cleanedParams
           );
 
           utils.success(`Deployment initiated: ${deployment.id || 'Success'}`);
