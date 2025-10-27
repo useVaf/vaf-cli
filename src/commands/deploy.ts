@@ -25,6 +25,59 @@ interface DeployOptions {
   runtime?: string;
   handler?: string;
   watch?: boolean;
+  'use-layers'?: boolean;
+}
+
+interface LayerResponse {
+  layerArn: string;
+  layerVersion: number;
+}
+
+async function createLayerPackage(cwd: string): Promise<string> {
+  const layerDir = path.join(cwd, '.vaf-layer');
+  const layerZip = path.join(cwd, '.vaf-layer-temp.zip');
+  
+  // Create layer directory structure: layer/nodejs/node_modules
+  const layerNodeJsDir = path.join(layerDir, 'nodejs');
+  
+  // Clean up old layer dir if exists
+  if (fs.existsSync(layerDir)) {
+    fs.rmSync(layerDir, { recursive: true, force: true });
+  }
+  
+  fs.mkdirSync(layerNodeJsDir, { recursive: true });
+  
+  // Copy node_modules to layer/nodejs/node_modules
+  const sourceNodeModules = path.join(cwd, 'node_modules');
+  const targetNodeModules = path.join(layerNodeJsDir, 'node_modules');
+  
+  if (fs.existsSync(sourceNodeModules)) {
+    utils.info('Packaging dependencies for Lambda layer...');
+    fs.cpSync(sourceNodeModules, targetNodeModules, { recursive: true });
+  } else {
+    throw new Error('node_modules not found. Run npm install first.');
+  }
+  
+  // Create zip of layer directory
+  await zipDirectory(layerDir, layerZip, []);
+  
+  // Clean up layer directory
+  fs.rmSync(layerDir, { recursive: true, force: true });
+  
+  return layerZip;
+}
+
+async function createThinPackage(cwd: string, tempZip: string): Promise<string> {
+  // Read ignore patterns
+  const ignorePatterns = await readVafIgnore(cwd);
+  
+  // Exclude node_modules for thin package
+  const thinPackagePatterns = [...ignorePatterns];
+  thinPackagePatterns.push('node_modules/**');
+  
+  await zipDirectory(cwd, tempZip, thinPackagePatterns);
+  
+  return tempZip;
 }
 
 interface VafConfig {
@@ -77,6 +130,7 @@ const deployCommand = new Command('deploy')
   .option('--handler <handler>', 'Handler function (e.g., index.handler)')
   .option('--watch', 'Watch for changes and auto-deploy')
   .option('--no-build', 'Skip running build commands from YAML')
+  .option('--use-layers', 'Use Lambda layers for large node_modules (recommended for >50MB packages)')
   .action(async (projectId, envName, options: DeployOptions) => {
     try {
       if (!config.getToken()) {
@@ -194,46 +248,117 @@ const deployCommand = new Command('deploy')
         // Read ignore patterns
         const ignorePatterns = await readVafIgnore(cwd);
         
-        // Remove node_modules from ignore patterns to include it in the deployment
-        const filteredIgnorePatterns = ignorePatterns.filter(
-          pattern => !pattern.includes('node_modules')
-        );
-        
-          // Create temp zip file with timestamp
-          const timestamp = Date.now();
-          const tempZip = path.join(cwd, `.vaf-deploy-temp-${timestamp}.zip`);
+        // Create temp zip file with timestamp
+        const timestamp = Date.now();
+        const tempZip = path.join(cwd, `.vaf-deploy-temp-${timestamp}.zip`);
+        const useLayers = options['use-layers'];
         
         try {
+          let layerArn: string | undefined;
+          
+          if (useLayers) {
+            // Create and upload layer
+            utils.info('Creating Lambda layer package...');
+            const layerZip = await createLayerPackage(cwd);
+            
+            const layerStats = fs.statSync(layerZip);
+            utils.info(`Layer package size: ${formatBytes(layerStats.size)}`);
+            
+            // Resolve environment for layer upload
+            utils.info('Resolving environment...');
+            const environments = await api.get<any[]>(
+              `/api/projects/${finalProjectId}/environments`
+            );
+            
+            let environmentId = finalEnvName;
+            const environment = environments.find(
+              (env: any) => env.name === finalEnvName || env.id === finalEnvName
+            );
+            
+            if (environment) {
+              environmentId = environment.id;
+            }
+            
+            // Get upload URL for layer
+            utils.info('Getting upload URL for layer...');
+            const layerUploadUrlResponse = await api.get<{ uploadUrl: string; key: string }>(
+              `/api/projects/${finalProjectId}/environments/${environmentId}/deployment/upload-url`
+            );
+            
+            // Upload layer
+            utils.info('Uploading layer...');
+            const layerFileBuffer = fs.readFileSync(layerZip);
+            await axios.put(layerUploadUrlResponse.uploadUrl, layerFileBuffer, {
+              headers: { 'Content-Type': 'application/zip' },
+            });
+            utils.success('Layer uploaded successfully');
+            
+            // Publish layer
+            utils.info('Publishing Lambda layer...');
+            const layerResponse = await api.post<LayerResponse>(
+              `/api/projects/${finalProjectId}/environments/${environmentId}/deployment/layer`,
+              { layerKey: layerUploadUrlResponse.key }
+            );
+            layerArn = layerResponse.layerArn;
+            utils.success(`Layer published: ${layerResponse.layerArn} (version ${layerResponse.layerVersion})`);
+            
+            // Clean up layer zip
+            fs.unlinkSync(layerZip);
+          }
+          
+          // Create function package (thin if using layers, full otherwise)
           utils.info('Creating deployment package...');
-          await zipDirectory(cwd, tempZip, filteredIgnorePatterns);
+          if (useLayers) {
+            await createThinPackage(cwd, tempZip);
+          } else {
+            const filteredIgnorePatterns = ignorePatterns.filter(
+              pattern => !pattern.includes('node_modules')
+            );
+            await zipDirectory(cwd, tempZip, filteredIgnorePatterns);
+          }
 
           const stats = fs.statSync(tempZip);
           utils.info(`Package size: ${formatBytes(stats.size)}`);
 
-          // Resolve environment name to ID
-          utils.info('Resolving environment...');
-          const environments = await api.get<any[]>(
-            `/api/projects/${finalProjectId}/environments`
-          );
-          
-          // Find environment by name (first try name, then use as ID)
+          // Resolve environment name to ID (if not already resolved for layer)
           let environmentId = finalEnvName;
-          const environment = environments.find(
-            (env: any) => env.name === finalEnvName || env.id === finalEnvName
-          );
-          
-          if (environment) {
-            environmentId = environment.id;
+          if (!useLayers) {
+            utils.info('Resolving environment...');
+            const environments = await api.get<any[]>(
+              `/api/projects/${finalProjectId}/environments`
+            );
+            
+            // Find environment by name (first try name, then use as ID)
+            const environment = environments.find(
+              (env: any) => env.name === finalEnvName || env.id === finalEnvName
+            );
+            
+            if (environment) {
+              environmentId = environment.id;
+            } else {
+              // Try to use finalEnvName as ID if no match by name
+              const envById = environments.find((env: any) => env.id === finalEnvName);
+              if (!envById) {
+                utils.error(`Environment "${finalEnvName}" not found`);
+                console.log(chalk.gray('Available environments:'));
+                environments.forEach((env: any) => {
+                  console.log(chalk.cyan(`  - ${env.name} (${env.id})`));
+                });
+                process.exit(1);
+              }
+            }
           } else {
-            // Try to use finalEnvName as ID if no match by name
-            const envById = environments.find((env: any) => env.id === finalEnvName);
-            if (!envById) {
-              utils.error(`Environment "${finalEnvName}" not found`);
-              console.log(chalk.gray('Available environments:'));
-              environments.forEach((env: any) => {
-                console.log(chalk.cyan(`  - ${env.name} (${env.id})`));
-              });
-              process.exit(1);
+            // Environment already resolved in layer upload, get it from there
+            const environments = await api.get<any[]>(
+              `/api/projects/${finalProjectId}/environments`
+            );
+            
+            const environment = environments.find(
+              (env: any) => env.name === finalEnvName || env.id === finalEnvName
+            );
+            
+            if (environment) {
+              environmentId = environment.id;
             }
           }
 
@@ -301,6 +426,11 @@ const deployCommand = new Command('deploy')
           const storageValue = options.storage || envConfig?.storage;
           if (storageValue && typeof storageValue === 'string' && storageValue.trim().length > 0) {
             deploymentParams.storage = storageValue;
+          }
+          
+          // Add layers if using layers
+          if (useLayers && layerArn) {
+            deploymentParams.layers = [layerArn];
           }
 
           // Remove undefined values to avoid validation errors

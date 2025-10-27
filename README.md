@@ -249,14 +249,24 @@ vaf deploy <project-id> <env-name> --watch
 - `--handler <handler>` - Handler function (overrides YAML)
 - `--no-build` - Skip running build commands from YAML
 - `--watch` - Watch for changes and auto-deploy
+- `--use-layers` - Use Lambda layers for large node_modules (>50MB recommended)
 
 **The deployment process:**
 1. Loads configuration from `vaf.yml` or `vapor.yml` (optional)
 2. Runs build commands from YAML or falls back to `npm run build`
-3. Creates a zip package (respects .vafignore)
-4. Gets a signed upload URL from the API
-5. Uploads the package
-6. Triggers deployment with your configuration
+3. Installs production dependencies (`npm ci --omit=dev`)
+4. Creates deployment package:
+   - **Without layers**: Includes source code + node_modules
+   - **With layers** (`--use-layers`): Creates layer with node_modules, thin package with code only
+5. Gets a signed upload URL from the API
+6. Uploads the package (and layer if using layers)
+7. Triggers deployment with your configuration
+
+**When to use layers:**
+- Package size > 50MB compressed
+- Large node_modules folder (>200MB uncompressed)
+- Want faster code-only deployments
+- Need to stay within Lambda limits (250MB unzipped)
 
 ### Configuration
 
