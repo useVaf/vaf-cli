@@ -131,8 +131,9 @@ const deployCommand = new Command('deploy')
   .option('--handler <handler>', 'Handler function (e.g., index.handler)')
   .option('--watch', 'Watch for changes and auto-deploy')
   .option('--no-build', 'Skip running build commands from YAML')
-  .option('--use-layers', 'Use Lambda layers for large node_modules (recommended for >50MB packages)')
-  .action(async (projectId, envName, options: DeployOptions) => {
+  .option('--use-layers', 'Use Lambda layers for large node_modules (default: true)')
+  .option('--no-use-layers', 'Disable Lambda layers, include node_modules in package')
+  .action(async (projectId, envName, options: DeployOptions & { 'no-use-layers'?: boolean }) => {
     try {
       if (!config.getToken()) {
         utils.error('Not authenticated. Please run "vaf login"');
@@ -254,9 +255,14 @@ const deployCommand = new Command('deploy')
         const tempZip = path.join(cwd, `.vaf-deploy-temp-${timestamp}.zip`);
         
         // Determine if we should use layers (CLI option overrides YAML config, defaults to true)
-        const useLayers = options['use-layers'] !== undefined 
-          ? options['use-layers'] 
-          : (envConfig?.useLayers !== undefined ? envConfig.useLayers : true);
+        let useLayers: boolean;
+        if (options['no-use-layers']) {
+          useLayers = false;
+        } else if (options['use-layers'] !== undefined) {
+          useLayers = options['use-layers'];
+        } else {
+          useLayers = envConfig?.useLayers !== undefined ? envConfig.useLayers : true;
+        }
         
         try {
           let layerArn: string | undefined;
