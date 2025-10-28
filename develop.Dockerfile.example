@@ -1,0 +1,23 @@
+# Development Dockerfile
+# This Dockerfile is used for development deployments
+
+FROM public.ecr.aws/lambda/nodejs:18
+
+# Set working directory
+WORKDIR ${LAMBDA_TASK_ROOT}
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (including dev dependencies for development)
+RUN npm ci --prefer-offline
+
+# Copy application code
+COPY . ${LAMBDA_TASK_ROOT}
+
+# Set environment to development
+ENV NODE_ENV=development
+
+# Set the CMD to the Lambda handler
+CMD [ "index.handler" ]
+

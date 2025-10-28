@@ -8,13 +8,15 @@ environments:
         database: dev-snapsnag-db
         cache: eventers-cache
         storage: develop-snapsnag-storage
+        # dockerfile: ./Dockerfile  # Optional: specify custom Dockerfile
+        # If not specified, will look for develop.Dockerfile or ./Dockerfile
+        imageTag: latest
+        # Build commands are skipped for Docker deployments
+        # The Dockerfile handles the build process
         build:
-            - 'npm ci'
-            - 'npm run build'
-            - 'echo "Build complete"'
+            - 'echo "Skipping build for Docker deployment"'
         deploy:
-            - 'npm run migrate'
-            - 'npm run seed'
+            - 'echo "Deployment commands run after image is pushed"'
     
     production:
         runtime: nodejs18.x

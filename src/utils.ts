@@ -81,3 +81,12 @@ export function formatBytes(bytes: number): string {
   return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
 
+export interface EcrConfigResponse {
+  ecrRepositoryUri: string;
+  ecrImageUri: string;
+  awsAccountId: string;
+  region: string;
+  repositoryName: string;
+  dockerLoginCommand: string;
+}
+

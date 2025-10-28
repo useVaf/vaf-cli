@@ -242,6 +242,8 @@ vaf deploy <project-id> <env-name> --use-layers
 - `environments.<env-name>.database` - Database name
 - `environments.<env-name>.cache` - Cache name
 - `environments.<env-name>.storage` - Storage name
+- `environments.<env-name>.dockerfile` - Path to Dockerfile (for docker runtime)
+- `environments.<env-name>.imageTag` - Docker image tag (for docker runtime)
 - `environments.<env-name>.build` - Array of build commands to run
 - `environments.<env-name>.deploy` - Array of deployment commands (future feature)
 
@@ -251,13 +253,17 @@ vaf deploy <project-id> <env-name> --use-layers
 - `--database <name>` - Database name (overrides YAML)
 - `--cache <name>` - Cache name (overrides YAML)
 - `--storage <name>` - Storage name (overrides YAML)
-- `--runtime <runtime>` - Runtime (overrides YAML)
+- `--runtime <runtime>` - Runtime (e.g., nodejs18.x, docker) (overrides YAML)
 - `--handler <handler>` - Handler function (overrides YAML)
+- `--dockerfile <path>` - Path to Dockerfile (for docker runtime). Overrides YAML config and env-specific Dockerfiles
+- `--image-tag <tag>` - Docker image tag (for docker runtime, defaults to latest)
 - `--no-build` - Skip running build commands from YAML
 - `--watch` - Watch for changes and auto-deploy
 - `--use-layers` - Use Lambda layers for large node_modules (>50MB recommended)
 
 **The deployment process:**
+
+For **Zip-based deployments** (nodejs18.x, etc.):
 1. Loads configuration from `vaf.yml` or `vapor.yml` (optional)
 2. Runs build commands from YAML or falls back to `npm run build`
 3. Installs production dependencies (`npm ci --omit=dev`)
@@ -267,6 +273,43 @@ vaf deploy <project-id> <env-name> --use-layers
 5. Gets a signed upload URL from the API
 6. Uploads the package (and layer if using layers)
 7. Triggers deployment with your configuration
+
+For **Docker deployments** (runtime: docker):
+1. Loads configuration from `vaf.yml` or `vapor.yml` (optional)
+2. Skips build commands (Dockerfile handles the build)
+3. Gets ECR configuration from the API (repository URI, login command, etc.)
+4. Authenticates with AWS ECR
+5. Builds Docker image using your Dockerfile
+6. Tags and pushes image to ECR
+7. Triggers deployment with image URI
+
+**Docker Example:**
+```bash
+# Deploy using Docker (runtime must be 'docker' in YAML or --runtime docker)
+vaf deploy production --runtime docker --image-tag v1.0.0
+
+# Override Dockerfile path
+vaf deploy production --runtime docker --dockerfile ./custom.Dockerfile
+```
+
+**Dockerfile Selection Priority:**
+1. `--dockerfile` CLI option (highest priority)
+2. `dockerfile` field in YAML config
+3. `{env-name}.Dockerfile` (e.g., `production.Dockerfile` for production environment)
+4. `./Dockerfile` (default fallback)
+
+**Dockerfile example:**
+```dockerfile
+# Default: ./Dockerfile
+# Or environment-specific: production.Dockerfile, develop.Dockerfile, etc.
+
+FROM public.ecr.aws/lambda/nodejs:18
+WORKDIR ${LAMBDA_TASK_ROOT}
+COPY package*.json ./
+RUN npm ci --omit=dev
+COPY . .
+CMD [ "index.handler" ]
+```
 
 **Lambda Layers:**
 Layers are **enabled by default** to handle large packages efficiently. They:

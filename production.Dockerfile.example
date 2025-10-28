@@ -1,0 +1,23 @@
+# Production Dockerfile
+# This Dockerfile is used for production deployments
+
+FROM public.ecr.aws/lambda/nodejs:18
+
+# Set working directory
+WORKDIR ${LAMBDA_TASK_ROOT}
+
+# Copy package files
+COPY package*.json ./
+
+# Install production dependencies only (no dev dependencies)
+RUN npm ci --omit=dev --prefer-offline
+
+# Copy application code
+COPY . ${LAMBDA_TASK_ROOT}
+
+# Set environment to production
+ENV NODE_ENV=production
+
+# Set the CMD to the Lambda handler
+CMD [ "index.handler" ]
+

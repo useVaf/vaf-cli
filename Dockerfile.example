@@ -1,0 +1,29 @@
+# Dockerfile for Lambda Container
+# This is an example Dockerfile for deploying Lambda functions using Docker
+
+# Choose the base image for your runtime
+# Available Lambda base images:
+# - public.ecr.aws/lambda/nodejs:18 (Node.js 18)
+# - public.ecr.aws/lambda/nodejs:20 (Node.js 20)
+# - public.ecr.aws/lambda/python:3.11 (Python 3.11)
+# - public.ecr.aws/lambda/python:3.12 (Python 3.12)
+
+FROM public.ecr.aws/lambda/nodejs:18
+
+# Set working directory
+WORKDIR ${LAMBDA_TASK_ROOT}
+
+# Copy package files
+COPY package*.json ./
+
+# Install production dependencies
+RUN npm ci --omit=dev
+
+# Copy application code
+COPY . ${LAMBDA_TASK_ROOT}
+
+# Set the CMD to the Lambda handler
+# Example handler: index.handler
+# This points to the handler function in your index.js file
+CMD [ "index.handler" ]
+

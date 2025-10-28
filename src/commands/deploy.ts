@@ -5,17 +5,78 @@ import chalk from 'chalk';
 import chokidar from 'chokidar';
 import axios from 'axios';
 import archiver from 'archiver';
-import { exec } from 'child_process';
+import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import * as yaml from 'js-yaml';
 import { ApiClient } from '../api';
 import { ConfigManager } from '../config';
 import * as utils from '../utils';
-import { zipDirectory, readVafIgnore, formatBytes } from '../utils';
+import { zipDirectory, readVafIgnore, formatBytes, EcrConfigResponse } from '../utils';
 
 const api = new ApiClient();
 const config = ConfigManager.getInstance();
 const execAsync = promisify(exec);
+
+async function getEcrConfig(
+  projectId: string,
+  environmentId: string
+): Promise<EcrConfigResponse> {
+  try {
+    const response = await api.get<EcrConfigResponse>(
+      `/api/projects/${projectId}/environments/${environmentId}/deployment/ecr-config`
+    );
+    return response;
+  } catch (error: any) {
+    throw new Error(`Failed to get ECR config: ${error.message}`);
+  }
+}
+
+async function buildAndPushDockerImage(
+  ecrConfig: EcrConfigResponse,
+  imageTag: string,
+  dockerfilePath: string
+): Promise<string> {
+  // Check if Dockerfile exists
+  if (!fs.existsSync(dockerfilePath)) {
+    throw new Error(`Dockerfile not found at ${dockerfilePath}`);
+  }
+
+  const repositoryName = ecrConfig.repositoryName;
+  const ecrUri = ecrConfig.ecrRepositoryUri;
+  const fullImageUri = `${ecrUri}:${imageTag}`;
+
+  utils.info(`Building Docker image: ${repositoryName}:${imageTag}`);
+
+  try {
+    // Step 1: Login to ECR
+    utils.info('Authenticating with AWS ECR...');
+    execSync(ecrConfig.dockerLoginCommand, { stdio: 'inherit' });
+
+    // Step 2: Build Docker image
+    utils.info('Building Docker image...');
+    execSync(`docker build -t ${repositoryName}:${imageTag} .`, {
+      stdio: 'inherit',
+    });
+
+    // Step 3: Tag image for ECR
+    utils.info('Tagging image for ECR...');
+    execSync(`docker tag ${repositoryName}:${imageTag} ${fullImageUri}`, {
+      stdio: 'inherit',
+    });
+
+    // Step 4: Push to ECR
+    utils.info('Pushing image to ECR...');
+    execSync(`docker push ${fullImageUri}`, {
+      stdio: 'inherit',
+    });
+
+    utils.success(`Successfully pushed image to ECR: ${fullImageUri}`);
+    return fullImageUri;
+  } catch (error: any) {
+    utils.error(`Docker build/push failed: ${error.message}`);
+    throw error;
+  }
+}
 
 interface DeployOptions {
   memory?: number;
@@ -27,6 +88,8 @@ interface DeployOptions {
   handler?: string;
   watch?: boolean;
   'use-layers'?: boolean;
+  dockerfile?: string;
+  'image-tag'?: string;
 }
 
 interface LayerResponse {
@@ -108,6 +171,8 @@ interface VafConfig {
       storage?: string;
       handler?: string;
       useLayers?: boolean;
+      dockerfile?: string;
+      imageTag?: string;
       build?: string[];
       deploy?: string[];
     };
@@ -142,8 +207,10 @@ const deployCommand = new Command('deploy')
   .option('--database <name>', 'Database name')
   .option('--cache <name>', 'Cache name')
   .option('--storage <name>', 'Storage name')
-  .option('--runtime <runtime>', 'Runtime (e.g., nodejs18.x)')
+  .option('--runtime <runtime>', 'Runtime (e.g., nodejs18.x, docker)')
   .option('--handler <handler>', 'Handler function (e.g., index.handler)')
+  .option('--dockerfile <path>', 'Path to Dockerfile (for docker runtime)', './Dockerfile')
+  .option('--image-tag <tag>', 'Docker image tag', 'latest')
   .option('--watch', 'Watch for changes and auto-deploy')
   .option('--no-build', 'Skip running build commands from YAML')
   .option('--use-layers', 'Use Lambda layers for large node_modules (default: true)')
@@ -222,8 +289,12 @@ const deployCommand = new Command('deploy')
           process.exit(1);
         }
         
-        // Run build commands from YAML
-        const skipBuild = options['no-build'] || false;
+        // Determine runtime
+        const runtime = options.runtime || envConfig?.runtime || 'nodejs18.x';
+        const isDockerDeployment = runtime === 'docker';
+        
+        // Run build commands from YAML (skip for Docker deployments)
+        const skipBuild = options['no-build'] || isDockerDeployment;
         if (envConfig?.build && !skipBuild) {
           utils.info('Running build commands...');
           for (const buildCmd of envConfig.build) {
@@ -262,6 +333,120 @@ const deployCommand = new Command('deploy')
           }
         }
 
+        // Handle Docker deployments
+        if (isDockerDeployment) {
+          utils.info('\n🐳 Docker deployment detected');
+          
+          // Resolve environment
+          let environmentId = finalEnvName;
+          const environments = await api.get<any[]>(
+            `/api/projects/${finalProjectId}/environments`
+          );
+          
+          const environment = environments.find(
+            (env: any) => env.name === finalEnvName || env.id === finalEnvName
+          );
+          
+          if (environment) {
+            environmentId = environment.id;
+          }
+          
+          // Get ECR config
+          utils.info('📦 Getting ECR configuration...');
+          const ecrConfig = await getEcrConfig(finalProjectId, environmentId);
+          
+          console.log(chalk.cyan(`  Repository: ${ecrConfig.ecrRepositoryUri}`));
+          console.log(chalk.cyan(`  Region: ${ecrConfig.region}`));
+          console.log(chalk.cyan(`  AWS Account: ${ecrConfig.awsAccountId}`));
+          
+          // Determine Dockerfile path with priority: CLI option > YAML config > env-specific > default
+          let dockerfile: string;
+          if (options.dockerfile) {
+            // Highest priority: CLI option
+            dockerfile = options.dockerfile;
+          } else if (envConfig?.dockerfile) {
+            // Second priority: YAML config
+            dockerfile = envConfig.dockerfile;
+          } else {
+            // Third priority: environment-specific Dockerfile
+            const envDockerfile = path.join(cwd, `${finalEnvName}.Dockerfile`);
+            if (fs.existsSync(envDockerfile)) {
+              dockerfile = envDockerfile;
+              utils.info(`Using environment-specific Dockerfile: ${finalEnvName}.Dockerfile`);
+            } else {
+              // Fallback: default Dockerfile
+              dockerfile = './Dockerfile';
+            }
+          }
+          
+          // Build and push Docker image
+          const imageTag = options['image-tag'] || envConfig?.imageTag || 'latest';
+          const imageUri = await buildAndPushDockerImage(ecrConfig, imageTag, dockerfile);
+          
+          // Prepare deployment parameters
+          const deploymentParams: any = {
+            runtime,
+            imageUri,
+          };
+          
+          // Add optional parameters
+          if (options.memory !== undefined) {
+            deploymentParams.memory = options.memory;
+          } else if (envConfig?.memory !== undefined) {
+            deploymentParams.memory = envConfig.memory;
+          }
+          
+          if (options.timeout !== undefined) {
+            deploymentParams.timeout = options.timeout;
+          } else if (envConfig?.timeout !== undefined) {
+            deploymentParams.timeout = envConfig.timeout;
+          }
+          
+          // Add database, cache, storage if specified
+          const dbValue = options.database || envConfig?.database;
+          if (dbValue && typeof dbValue === 'string' && dbValue.trim().length > 0) {
+            deploymentParams.database = dbValue;
+          }
+          
+          const cacheValue = options.cache || envConfig?.cache;
+          if (cacheValue && typeof cacheValue === 'string' && cacheValue.trim().length > 0) {
+            deploymentParams.cache = cacheValue;
+          }
+          
+          const storageValue = options.storage || envConfig?.storage;
+          if (storageValue && typeof storageValue === 'string' && storageValue.trim().length > 0) {
+            deploymentParams.storage = storageValue;
+          }
+          
+          // Remove undefined values
+          const cleanedParams: any = {};
+          Object.keys(deploymentParams).forEach(key => {
+            if (deploymentParams[key] !== undefined && deploymentParams[key] !== null) {
+              cleanedParams[key] = deploymentParams[key];
+            }
+          });
+          
+          utils.info('Deployment parameters:');
+          console.log(chalk.gray(JSON.stringify(cleanedParams, null, 2)));
+          
+          // Trigger deployment
+          utils.info('🚀 Deploying to Lambda...');
+          const deployment = await api.post<any>(
+            `/api/projects/${finalProjectId}/environments/${environmentId}/deployment/deploy`,
+            cleanedParams
+          );
+          
+          utils.success(`Deployment initiated: ${deployment.id || 'Success'}`);
+          
+          // Poll for deployment status if we have an ID
+          if (deployment.id) {
+            await pollDeploymentStatus(finalProjectId, environmentId, deployment.id);
+          }
+          
+          return;
+        }
+        
+        // Zip-based deployment flow continues below
         // Read ignore patterns
         const ignorePatterns = await readVafIgnore(cwd);
         
