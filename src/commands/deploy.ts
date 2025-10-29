@@ -43,7 +43,7 @@ async function buildAndPushDockerImage(
 
   const repositoryName = ecrConfig.repositoryName;
   const ecrUri = ecrConfig.ecrRepositoryUri;
-  const fullImageUri = `${ecrUri}:${imageTag}`;
+  const fullImageUri = ecrConfig.ecrImageUri;
 
   utils.info(`Building Docker image: ${repositoryName}:${imageTag}`);
 
@@ -52,9 +52,10 @@ async function buildAndPushDockerImage(
     utils.info('Authenticating with AWS ECR...');
     execSync(ecrConfig.dockerLoginCommand, { stdio: 'inherit' });
 
-    // Step 2: Build Docker image
-    utils.info('Building Docker image...');
-    execSync(`docker build -t ${repositoryName}:${imageTag} .`, {
+    // Step 2: Build Docker image for Lambda using buildx for cross-platform support
+    utils.info('Building Docker image for Lambda (linux/amd64)...');
+    // Use buildx with --load to build for linux/amd64 and load into local Docker
+    execSync(`docker buildx build --platform linux/amd64 --load -t ${repositoryName}:${imageTag} .`, {
       stdio: 'inherit',
     });
 
@@ -339,6 +340,7 @@ const deployCommand = new Command('deploy')
           
           // Resolve environment
           let environmentId = finalEnvName;
+          utils.info('Resolving environment...');
           const environments = await api.get<any[]>(
             `/api/projects/${finalProjectId}/environments`
           );
@@ -431,8 +433,9 @@ const deployCommand = new Command('deploy')
           
           // Trigger deployment
           utils.info('🚀 Deploying to Lambda...');
+          const deployUrl = `/api/projects/${finalProjectId}/environments/${environmentId}/deployment/deploy`;
           const deployment = await api.post<any>(
-            `/api/projects/${finalProjectId}/environments/${environmentId}/deployment/deploy`,
+            deployUrl,
             cleanedParams
           );
           

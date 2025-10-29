@@ -311,6 +311,8 @@ COPY . .
 CMD [ "index.handler" ]
 ```
 
+**Important:** Docker images are automatically built using `docker buildx` for `linux/amd64` architecture to ensure compatibility with AWS Lambda, regardless of your local machine's architecture (including Apple Silicon Macs).
+
 **Lambda Layers:**
 Layers are **enabled by default** to handle large packages efficiently. They:
 - Keep deployment packages within Lambda limits (250MB unzipped)

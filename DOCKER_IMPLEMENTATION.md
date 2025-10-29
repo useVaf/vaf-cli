@@ -188,5 +188,8 @@ Example:
 
 - Docker deployments skip the build step automatically
 - Lambda layers are not used for Docker deployments
+- Docker images are built using `docker buildx` for `linux/amd64` platform (required for AWS Lambda)
+- The `--load` flag loads the built image into local Docker for pushing to ECR
+- This ensures compatibility even when building on Apple Silicon (M1/M2/M3) Macs
 - Watch mode works with Docker deployments
 - The Docker image must follow AWS Lambda container image format
