@@ -434,9 +434,11 @@ const deployCommand = new Command('deploy')
           // Trigger deployment
           utils.info('🚀 Deploying to Lambda...');
           const deployUrl = `/api/projects/${finalProjectId}/environments/${environmentId}/deployment/deploy`;
+          // Use a longer timeout for deployment operations
           const deployment = await api.post<any>(
             deployUrl,
-            cleanedParams
+            cleanedParams,
+            { timeout: 900000 } // 15 minutes for Docker deployments
           );
           
           utils.success(`Deployment initiated: ${deployment.id || 'Success'}`);
@@ -504,6 +506,7 @@ const deployCommand = new Command('deploy')
             const layerFileBuffer = fs.readFileSync(layerZip);
             await axios.put(layerUploadUrlResponse.uploadUrl, layerFileBuffer, {
               headers: { 'Content-Type': 'application/zip' },
+              timeout: 600000, // 10 minutes for large layer uploads
             });
             utils.success('Layer uploaded successfully');
             
@@ -596,6 +599,7 @@ const deployCommand = new Command('deploy')
               headers: {
                 'Content-Type': 'application/zip',
               },
+              timeout: 600000, // 10 minutes for large file uploads
             });
             utils.success('Package uploaded successfully');
           } catch (uploadError: any) {
@@ -661,7 +665,8 @@ const deployCommand = new Command('deploy')
           // Trigger deployment
           const deployment = await api.post<any>(
             `/api/projects/${finalProjectId}/environments/${environmentId}/deployment/deploy`,
-            cleanedParams
+            cleanedParams,
+            { timeout: 600000 } // 10 minutes for zip deployments
           );
 
           utils.success(`Deployment initiated: ${deployment.id || 'Success'}`);

@@ -21,7 +21,7 @@ export class ApiClient {
     this.config = ConfigManager.getInstance();
     this.client = axios.create({
       baseURL: this.config.getApiUrl(),
-      timeout: 30000,
+      timeout: 600000, // 10 minutes for operations like deployments
       headers: {
         'Content-Type': 'application/json',
       },
