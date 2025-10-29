@@ -1,6 +1,6 @@
 {
   "name": "vaf-cli",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "description": "VAF CLI - Command-line interface for VAF backend API",
   "main": "dist/index.js",
   "bin": {
